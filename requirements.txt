@@ -1,0 +1,10 @@
+langchain
+langchain-openai
+langchain-community
+langchain-core
+openpyxl
+pandas
+python-dotenv
+faiss-cpu
+matplotlib
+scikit-learn
