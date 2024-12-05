@@ -52,14 +52,15 @@ if st.button("질문하기") or st.session_state.submit_question:
     if question.strip():
         with st.spinner("답변을 생성 중입니다..."):
             # 질문을 임베딩
-            question_embedding = embedding_model.embed_query(question)
+            # question_embedding = embedding_model.embed_query(question)
 
-            # 리트리버에서 문서 검색
-            retrieved_documents = vectorstore.similarity_search_by_vector(question_embedding, k=5)
+            # 리트리버에서 문서 검색 (MMR 방식 사용)
+            retrieved_documents = retriever.invoke(question)
 
             # RAG를 사용하여 응답 생성
             response = rag_chain.invoke(question)
-
+            print(f"response: {response}")
+            
             # 응답 출력
             st.subheader("챗봇 응답:")
             st.write(response)
