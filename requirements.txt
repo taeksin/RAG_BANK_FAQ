@@ -8,3 +8,5 @@ python-dotenv
 faiss-cpu
 matplotlib
 scikit-learn
+streamlit-cookies-manager
+tqdm
