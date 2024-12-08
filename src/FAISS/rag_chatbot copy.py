@@ -9,7 +9,7 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 
-# 페이지 설정 (가장 첫 번째 Streamlit 명령어)
+# 페이지 설정
 st.set_page_config(page_title="RAG 기반 챗봇", layout="wide")
 
 # .env 파일 로드
@@ -26,6 +26,25 @@ st.title("RAG 기반 FAQ 챗봇 🤖")
 cookies = EncryptedCookieManager(prefix="faq_chatbot", password="secure-password")
 if not cookies.ready():
     st.stop()
+
+# 세션 상태 초기화 및 쿠키에서 데이터 로드
+if "chat_history" not in st.session_state:
+    # 쿠키에서 데이터 로드
+    chat_history = cookies.get("chat_history")
+    if chat_history:
+        st.session_state.chat_history = json.loads(chat_history)
+    else:
+        st.session_state.chat_history = []  # 초기화 시 빈 리스트로 설정
+
+if "current_question" not in st.session_state:
+    st.session_state.current_question = None
+if "current_response" not in st.session_state:
+    st.session_state.current_response = None
+if "loading" not in st.session_state:
+    st.session_state.loading = False
+
+# 히스토리 디버깅: 쿠키에서 로드된 데이터 확인
+st.write("디버깅: 쿠키에서 로드된 히스토리:", st.session_state.chat_history)
 
 # 임베딩 모델 생성
 embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
@@ -48,25 +67,9 @@ rag_chain = (
     | StrOutputParser()
 )
 
-# 세션 상태 초기화
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-if "current_question" not in st.session_state:
-    st.session_state.current_question = None
-if "current_response" not in st.session_state:
-    st.session_state.current_response = None
-if "loading" not in st.session_state:
-    st.session_state.loading = False
-
-# 쿠키에서 히스토리 로드
-if "loaded_history" not in st.session_state:
-    chat_history = cookies.get("chat_history")
-    if chat_history:
-        st.session_state.chat_history = json.loads(chat_history)
-    st.session_state.loaded_history = True
-
 # 히스토리 표시
 if st.session_state.chat_history:
+    st.subheader("히스토리:")
     for i, entry in enumerate(st.session_state.chat_history):
         with st.expander(f"질문 {i+1}: {entry['질문']}"):
             st.write(f"**질문:** {entry['질문']}")
@@ -95,8 +98,6 @@ if st.session_state.loading and st.session_state.current_question:
                 "은행": doc.metadata.get("은행", "정보 없음"),
                 "1차분류": doc.metadata.get("1차분류", "정보 없음"),
                 "2차분류": doc.metadata.get("2차분류", "정보 없음"),
-                "질문": doc.metadata.get("질문", "정보 없음"),
-                "답변": doc.metadata.get("답변", "정보 없음"),
             }
             for doc in retrieved_documents
         ]
@@ -122,28 +123,8 @@ if st.session_state.loading and st.session_state.current_question:
 if st.session_state.loading:
     st.subheader("챗봇 응답:")
     st.write("응답을 기다리는 중입니다...")
-    
-    # 검색된 문서 섹션 숨기기
-    st.subheader("검색된 문서:")
-    st.write("응답 생성 중에는 문서를 표시할 수 없습니다.")
+
 elif st.session_state.current_response:
     st.subheader("챗봇 응답:")
-    
-    # 질문과 응답을 함께 표시
     st.write(f"**질문:** {st.session_state.current_response['질문']}")
     st.write(f"**응답:** {st.session_state.current_response['응답']}")
-
-    # 검색된 문서 출력
-    st.subheader("검색된 문서:")
-    with st.expander("검색된 문서 보기 (클릭하여 펼치기)"):
-        for idx, doc in enumerate(st.session_state.current_response["문서"][:5], 1):  # 최대 5개 문서만 출력
-            st.write(f"### 문서 {idx}:")
-            st.write(f"- **은행**: {doc['은행']}")
-            st.write(f"- **1차 분류**: {doc['1차분류']}")
-            st.write(f"- **2차 분류**: {doc['2차분류']}")
-            st.write(f"- **질문**: {doc['질문']}")
-            st.write(f"- **답변**: {doc['답변']}")
-
-            # 문서 간 구분선
-            if idx < len(st.session_state.current_response["문서"][:5]):
-                st.markdown("---")
