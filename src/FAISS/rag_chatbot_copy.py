@@ -1,8 +1,8 @@
 import os
 import json
 import streamlit as st
-from streamlit_cookies_manager import EncryptedCookieManager
 from langchain import hub
+from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
@@ -10,7 +10,7 @@ from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 
 # 페이지 설정
-st.set_page_config(page_title="RAG 기반 챗봇", layout="wide")
+st.set_page_config(page_title="RAG 기반 FAQ 챗봇", layout="wide")
 
 # .env 파일 로드
 load_dotenv()
@@ -22,19 +22,9 @@ os.environ["OPENAI_API_KEY"] = api_key
 # Streamlit 기본 설정
 st.title("RAG 기반 FAQ 챗봇 🤖")
 
-# 쿠키 관리 초기화
-cookies = EncryptedCookieManager(prefix="faq_chatbot", password="secure-password")
-if not cookies.ready():
-    st.stop()
-
-# 세션 상태 초기화 및 쿠키에서 데이터 로드
+# 세션 상태 초기화
 if "chat_history" not in st.session_state:
-    # 쿠키에서 데이터 로드
-    chat_history = cookies.get("chat_history")
-    if chat_history:
-        st.session_state.chat_history = json.loads(chat_history)
-    else:
-        st.session_state.chat_history = []  # 초기화 시 빈 리스트로 설정
+    st.session_state.chat_history = []
 
 if "current_question" not in st.session_state:
     st.session_state.current_question = None
@@ -43,8 +33,23 @@ if "current_response" not in st.session_state:
 if "loading" not in st.session_state:
     st.session_state.loading = False
 
-# 히스토리 디버깅: 쿠키에서 로드된 데이터 확인
-st.write("디버깅: 쿠키에서 로드된 히스토리:", st.session_state.chat_history)
+# JSON 파일 경로 설정
+history_file_path = "chat_history.json"
+
+# 히스토리 파일을 로드하는 함수
+def load_chat_history():
+    if os.path.exists(history_file_path):
+        with open(history_file_path, "r", encoding="utf-8") as file:
+            return json.load(file)
+    return []
+
+# 히스토리 저장 함수
+def save_chat_history():
+    try:
+        with open(history_file_path, "w", encoding="utf-8") as file:
+            json.dump(st.session_state.chat_history, file, ensure_ascii=False, indent=4)
+    except Exception as e:
+        st.error(f"히스토리 저장 중 오류가 발생했습니다: {e}")
 
 # 임베딩 모델 생성
 embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
@@ -57,48 +62,32 @@ faiss_path = os.path.join(base_dir, "data/faiss_index")
 vectorstore = FAISS.load_local(faiss_path, embeddings=embedding_model, allow_dangerous_deserialization=True)
 retriever = vectorstore.as_retriever(search_type='mmr', search_kwargs={'k': 5, 'fetch_k': 10, 'lambda_mult': 0.9})
 
-# RAG 구성 요소 설정
-# prompt = hub.pull("fas_rag_platformdata")
-prompt = """
-You are an AI assistant specializing in Question Answering (QA) tasks within a Retrieval-Augmented Generation (RAG) system.
-Your primary mission is to answer questions based on the provided context or chat history.
-The context provided consists of documents such as laws, enforcement ordinances, regulations, and manuals of Korean institutions.
-When answering, it is crucial to use the wording of the context as it is, ensuring that key terms or key sentences are not omitted.
-### 
-The final answer should be concise but include important figures, terminology, technical jargon, and names, while also specifying the source of the information.
-# Steps:
-1. Carefully read and understand the provided context.
-2. Identify key information related to the contextual questions.
-3. Create a concise answer based on the relevant information.
-4. Verify that the final answer directly addresses the question.
-5. List the source of the answer using the file name (including page number) or document name. If the source cannot be identified, it may be omitted.
-# Output Format:
-Provide a concise answer to the question first, followed by a detailed explanation of the key information on which the answer is based.
-**Source** (optional)
-- (The source of the answer must be either a file name or document name; omit it if the source cannot be identified.)
-- (If there are multiple sources, list them in detail.)
-- ...
-###
-Remember:
-- The answers must be based solely on the **provided context**.
-- Do not use external knowledge or information that is not in the given material.
-- If the source of the answer cannot be identified, you must state that you don't know.
-- Answers must always be written in Korean.
-###
-# Questions to be answered:
-{question}
-# The context you should use to answer the question is as follows:
-{context}
-# Final answer to your question:
-"""
+# 프롬프트 파일 경로 설정
+prompt_file_path = "src/FAISS/prompt.txt"
 
+# 텍스트 파일을 읽어와 프롬프트 텍스트로 저장
+def load_prompt_from_file(file_path):
+    with open(file_path, "r", encoding="utf-8") as file:
+        return file.read()
 
+# 파일에서 프롬프트 텍스트 읽기
+prompt_text = load_prompt_from_file(prompt_file_path)
+
+# PromptTemplate 설정
+prompt = PromptTemplate(
+    input_variables=["question", "context"],  # 필요한 입력 변수 설정
+    template=prompt_text  # 텍스트 파일에서 읽어온 프롬프트 텍스트
+)
+
+# LLM 모델 설정
 llm = ChatOpenAI(model_name="gpt-4o", temperature=0.5)
+
+# RAG 체인 설정
 rag_chain = (
-    {"context": retriever, "question": RunnablePassthrough()}
-    | prompt
-    | llm
-    | StrOutputParser()
+    {"context": retriever, "question": RunnablePassthrough()}  # 질의 및 컨텍스트 설정
+    | prompt  # 읽어온 텍스트 파일을 템플릿으로 사용
+    | llm  # OpenAI의 GPT 모델을 사용하여 응답 생성
+    | StrOutputParser()  # 문자열로 출력
 )
 
 # 히스토리 표시 함수
@@ -110,22 +99,6 @@ def display_history(container):
                 with st.expander(f"질문 {i+1}: {entry['질문']}"):
                     st.write(f"**질문:** {entry['질문']}")
                     st.write(f"**답변:** {entry['응답']}")
-
-# 쿠키 저장 디버깅 및 데이터 최소화
-def save_chat_history_to_cookies(cookies):
-    try:
-        # 데이터를 JSON 형식으로 변환
-        history_data = json.dumps(st.session_state.chat_history)
-        
-        # 크기 제한 확인
-        if len(history_data) > 4000:  # 4KB 제한
-            st.error("히스토리 데이터가 너무 커서 쿠키에 저장할 수 없습니다.")
-        else:
-            # 쿠키에 저장
-            cookies["chat_history"] = history_data
-            cookies.save()
-    except Exception as e:
-        st.error(f"쿠키 저장 중 오류가 발생했습니다: {e}")
 
 # UI 컨테이너 생성
 history_container = st.container()
@@ -147,9 +120,7 @@ if user_input:
     else:
         st.warning("현재 질문에 대한 응답이 처리 중입니다. 잠시만 기다려주세요.")
 
-
-
-# 기존 코드에서 쿠키 저장 부분 수정
+# 기존 코드에서 응답 처리 부분
 if st.session_state.loading and st.session_state.current_question:
     try:
         with st.spinner("답변을 생성 중입니다..."):
@@ -157,27 +128,15 @@ if st.session_state.loading and st.session_state.current_question:
             retrieved_documents = retriever.invoke(st.session_state.current_question)
             response = rag_chain.invoke(st.session_state.current_question)
 
-            # 현재 응답과 히스토리 업데이트
-            documents_for_history = [
-                {
-                    "은행": doc.metadata.get("은행", "정보 없음"),
-                    "1차분류": doc.metadata.get("1차분류", "정보 없음"),
-                    "2차분류": doc.metadata.get("2차분류", "정보 없음"),
-                }
-                for doc in retrieved_documents
-            ]
-
             # 응답 저장
             st.session_state.current_response = {
                 "질문": st.session_state.current_question,
                 "응답": response,
-                # "문서": documents_for_history,
             }
             st.session_state.chat_history[-1]["응답"] = response
-            # st.session_state.chat_history[-1]["문서"] = documents_for_history
 
-            # 쿠키에 히스토리 저장 (디버깅 추가)
-            save_chat_history_to_cookies(cookies)
+            # 히스토리 저장
+            save_chat_history()
 
     except Exception as e:
         st.error(f"응답 생성 중 오류가 발생했습니다: {e}")
@@ -190,7 +149,6 @@ if st.session_state.loading and st.session_state.current_question:
         # 응답 생성 후 히스토리 컨테이너를 새로 렌더링
         history_container.empty()  # 기존 내용을 지움
         display_history(history_container)  # 새로 렌더링
-
 
 # 현재 응답 출력
 if st.session_state.loading:
