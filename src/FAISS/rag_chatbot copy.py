@@ -67,57 +67,96 @@ rag_chain = (
     | StrOutputParser()
 )
 
-# 히스토리 표시
-if st.session_state.chat_history:
-    st.subheader("히스토리:")
-    for i, entry in enumerate(st.session_state.chat_history):
-        with st.expander(f"질문 {i+1}: {entry['질문']}"):
-            st.write(f"**질문:** {entry['질문']}")
-            st.write(f"**답변:** {entry['응답']}")
+# 히스토리 표시 함수
+def display_history(container):
+    with container:
+        if st.session_state.chat_history:
+            st.subheader("히스토리:")
+            for i, entry in enumerate(st.session_state.chat_history):
+                with st.expander(f"질문 {i+1}: {entry['질문']}"):
+                    st.write(f"**질문:** {entry['질문']}")
+                    st.write(f"**답변:** {entry['응답']}")
+
+# 쿠키 저장 디버깅 및 데이터 최소화
+def save_chat_history_to_cookies(cookies):
+    try:
+        # 데이터를 JSON 형식으로 변환
+        history_data = json.dumps(st.session_state.chat_history)
+        
+        # 크기 제한 확인
+        if len(history_data) > 4000:  # 4KB 제한
+            st.error("히스토리 데이터가 너무 커서 쿠키에 저장할 수 없습니다.")
+        else:
+            # 쿠키에 저장
+            cookies["chat_history"] = history_data
+            cookies.save()
+    except Exception as e:
+        st.error(f"쿠키 저장 중 오류가 발생했습니다: {e}")
+
+# UI 컨테이너 생성
+history_container = st.container()
+
+# 초기 히스토리 표시
+display_history(history_container)
 
 # 사용자 입력 처리
 user_input = st.chat_input("질문을 입력하세요...")
-if user_input and not st.session_state.loading:
-    st.session_state.current_question = user_input
-    st.session_state.loading = True  # 로딩 상태 시작
-    st.session_state.current_response = None
+if user_input:
+    # 입력값 유효성 검사
+    if not st.session_state.loading:
+        st.session_state.current_question = user_input
+        st.session_state.loading = True  # 로딩 상태 시작
+        st.session_state.current_response = None
 
-    # 현재 질문을 히스토리에 즉시 추가 (응답은 나중에 업데이트)
-    st.session_state.chat_history.append({"질문": user_input, "응답": "응답 생성 중..."})
+        # 현재 질문을 히스토리에 즉시 추가 (응답은 나중에 업데이트)
+        st.session_state.chat_history.append({"질문": user_input, "응답": "응답 생성 중..."})
+    else:
+        st.warning("현재 질문에 대한 응답이 처리 중입니다. 잠시만 기다려주세요.")
 
-# 응답 생성 및 상태 업데이트
+
+
+# 기존 코드에서 쿠키 저장 부분 수정
 if st.session_state.loading and st.session_state.current_question:
-    with st.spinner("답변을 생성 중입니다..."):
-        # RAG 응답 생성
-        retrieved_documents = retriever.invoke(st.session_state.current_question)
-        response = rag_chain.invoke(st.session_state.current_question)
+    try:
+        with st.spinner("답변을 생성 중입니다..."):
+            # RAG 응답 생성
+            retrieved_documents = retriever.invoke(st.session_state.current_question)
+            response = rag_chain.invoke(st.session_state.current_question)
 
-        # 현재 응답과 히스토리 업데이트
-        documents_for_history = [
-            {
-                "은행": doc.metadata.get("은행", "정보 없음"),
-                "1차분류": doc.metadata.get("1차분류", "정보 없음"),
-                "2차분류": doc.metadata.get("2차분류", "정보 없음"),
+            # 현재 응답과 히스토리 업데이트
+            documents_for_history = [
+                {
+                    "은행": doc.metadata.get("은행", "정보 없음"),
+                    "1차분류": doc.metadata.get("1차분류", "정보 없음"),
+                    "2차분류": doc.metadata.get("2차분류", "정보 없음"),
+                }
+                for doc in retrieved_documents
+            ]
+
+            # 응답 저장
+            st.session_state.current_response = {
+                "질문": st.session_state.current_question,
+                "응답": response,
+                # "문서": documents_for_history,
             }
-            for doc in retrieved_documents
-        ]
+            st.session_state.chat_history[-1]["응답"] = response
+            # st.session_state.chat_history[-1]["문서"] = documents_for_history
 
-        # 응답 저장
-        st.session_state.current_response = {
-            "질문": st.session_state.current_question,
-            "응답": response,
-            "문서": documents_for_history,
-        }
-        st.session_state.chat_history[-1]["응답"] = response
-        st.session_state.chat_history[-1]["문서"] = documents_for_history
+            # 쿠키에 히스토리 저장 (디버깅 추가)
+            save_chat_history_to_cookies(cookies)
 
-        # 쿠키에 히스토리 저장
-        cookies["chat_history"] = json.dumps(st.session_state.chat_history)
-        cookies.save()
-
+    except Exception as e:
+        st.error(f"응답 생성 중 오류가 발생했습니다: {e}")
+        st.session_state.chat_history[-1]["응답"] = "응답 생성에 실패했습니다. 다시 시도해주세요."
+    finally:
         # 상태 갱신
         st.session_state.loading = False
         st.session_state.current_question = None
+
+        # 응답 생성 후 히스토리 컨테이너를 새로 렌더링
+        history_container.empty()  # 기존 내용을 지움
+        display_history(history_container)  # 새로 렌더링
+
 
 # 현재 응답 출력
 if st.session_state.loading:
