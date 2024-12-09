@@ -10,3 +10,5 @@ matplotlib
 scikit-learn
 streamlit-cookies-manager
 tqdm
+langchain 
+langsmith
