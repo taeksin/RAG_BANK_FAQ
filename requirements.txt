@@ -9,6 +9,7 @@ faiss-cpu
 matplotlib
 scikit-learn
 streamlit-cookies-manager
+streamlit-cookie-manager
 tqdm
 langchain 
 langsmith

@@ -5,7 +5,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
 
 # 데이터 로드
-file_path = "data/data_source/woori_faq.xlsx"
+file_path = "data/data_source/woori_faq_줄바꿈.xlsx"
 df = pd.read_excel(file_path, sheet_name="Sheet1", engine="openpyxl")
 
 # Document 및 메타데이터 생성
@@ -35,5 +35,5 @@ embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
 vectorstore = FAISS.from_documents(documents=documents, embedding=embedding_model)
 
 # 저장
-vectorstore.save_local("data/faiss_index")
+vectorstore.save_local("data/faiss_index_clean")
 print("임베딩 및 저장 완료!")
