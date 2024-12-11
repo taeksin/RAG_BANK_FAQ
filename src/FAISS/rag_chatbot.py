@@ -138,7 +138,7 @@ def display_history(container):
                         <div style="text-align: left; margin-bottom: 10px;">
                             <div style="
                                 display: inline-block;
-                                background-color: #FFFFFF;
+                                background-color: #e2e2e2;
                                 border-radius: 10px;
                                 padding: 10px 15px;
                                 color: black;
