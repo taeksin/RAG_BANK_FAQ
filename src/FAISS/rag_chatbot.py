@@ -109,49 +109,12 @@ def display_history(container):
 
             # 현재 사용자 uid에 해당하는 히스토리만 표시
             user_history = st.session_state.chat_history.get(st.session_state.uid, [])
-
+            
             if user_history:  # 해당 사용자의 히스토리가 있을 경우
                 for entry in user_history:
-                    # 질문 말풍선
-                    st.markdown(
-                        f"""
-                        <div style="text-align: right; margin-bottom: 10px;">
-                            <div style="
-                                display: inline-block;
-                                background-color: #DCF8C6;
-                                border-radius: 10px;
-                                padding: 10px 15px;
-                                color: black;
-                                max-width: 80%;
-                                word-wrap: break-word;
-                                box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
-                            ">
-                                {entry['질문']}
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True
-                    )
-
-                    # 응답 말풍선
-                    st.markdown(
-                        f"""
-                        <div style="text-align: left; margin-bottom: 10px;">
-                            <div style="
-                                display: inline-block;
-                                background-color: #e2e2e2;
-                                border-radius: 10px;
-                                padding: 10px 15px;
-                                color: black;
-                                max-width: 95%;
-                                word-wrap: break-word;
-                                box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
-                                border: 1px solid #E6E6E6;
-                            ">
-                                {entry['응답']}
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True
-                    )
+                    # 각 질문과 응답을 묶어서 Expander로 표시
+                    with st.expander(f"질문: {entry['질문']}"):
+                        st.write(f"**응답:** {entry['응답']}")
             else:
                 st.write("현재 히스토리가 없습니다.")
 
@@ -210,12 +173,12 @@ if st.session_state.loading and st.session_state.current_question:
         history_container.empty()  # 기존 내용을 지움
         display_history(history_container)  # 새로 렌더링
 
-# # 현재 응답 출력
-# if st.session_state.loading:
-#     st.subheader("챗봇 응답:")
-#     st.write("응답을 기다리는 중입니다...")
+# 현재 응답 출력
+if st.session_state.loading:
+    st.subheader("챗봇 응답:")
+    st.write("응답을 기다리는 중입니다...")
 
-# elif st.session_state.current_response:
-#     st.subheader("챗봇 응답:")
-#     st.write(f"**질문:** {st.session_state.current_response['질문']}")
-#     st.write(f"**응답:** {st.session_state.current_response['응답']}")
+elif st.session_state.current_response:
+    st.subheader("챗봇 응답:")
+    st.write(f"**질문:** {st.session_state.current_response['질문']}")
+    st.write(f"**응답:** {st.session_state.current_response['응답']}")
