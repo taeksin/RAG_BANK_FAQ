@@ -105,18 +105,19 @@ rag_chain = (
 def display_history(container):
     with container:
         if st.session_state.chat_history:
-            st.subheader("히스토리:")
 
             # 현재 사용자 uid에 해당하는 히스토리만 표시
             user_history = st.session_state.chat_history.get(st.session_state.uid, [])
 
             if user_history:  # 해당 사용자의 히스토리가 있을 경우
                 for entry in user_history:
+                    
                     # 질문 말풍선
                     st.markdown(
                         f"""
                         <div style="text-align: right; margin-bottom: 10px;">
                             <div style="
+                                text-align: left;
                                 display: inline-block;
                                 background-color: #DCF8C6;
                                 border-radius: 10px;
@@ -138,7 +139,7 @@ def display_history(container):
                         <div style="text-align: left; margin-bottom: 10px;">
                             <div style="
                                 display: inline-block;
-                                background-color: #e2e2e2;
+                                background-color: #606060;
                                 border-radius: 10px;
                                 padding: 10px 15px;
                                 color: black;

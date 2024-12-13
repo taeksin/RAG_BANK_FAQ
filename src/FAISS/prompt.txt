@@ -12,6 +12,7 @@ Improve readability, and if URLs are included, add spaces (" ") before and after
 
 # Output Format:
 - Provide a answer to the question followed by a detailed explanation of supporting information.
+
 **경로** (optional)
 - If the answer includes a menu path, use "->" arrows.
 **준비물** (optional)

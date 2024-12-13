@@ -55,10 +55,8 @@ def save_chat_history():
 # UID 세션 상태 초기화 및 저장
 if "uid" not in st.session_state:
     st.session_state.uid = str(int(time.time()))  # 새 UID 생성 (현재 시간 기반)
-
 # # 세션 상태에 저장된 UID 표시
 # st.write(f"사용자의 UID: {st.session_state.uid}")
-
 # 히스토리 파일 로드
 st.session_state.chat_history = load_chat_history()
 
@@ -67,32 +65,27 @@ embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
 
 # FAISS 저장소 경로 설정
 base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-faiss_path = os.path.join(base_dir, "data/faiss_index")
+faiss_path = os.path.join(base_dir, "data/faiss_index_clean")
 
 # 벡터 저장소 로드
 vectorstore = FAISS.load_local(faiss_path, embeddings=embedding_model, allow_dangerous_deserialization=True)
 retriever = vectorstore.as_retriever(search_type='mmr', search_kwargs={'k': 5, 'fetch_k': 10, 'lambda_mult': 0.9})
 
 # 프롬프트 파일 경로 설정
-prompt_file_path = "src/FAISS/prompt.txt"
-
+prompt_file_path = "src/FAISS/prompt_before.txt"
 # 텍스트 파일을 읽어와 프롬프트 텍스트로 저장
 def load_prompt_from_file(file_path):
     with open(file_path, "r", encoding="utf-8") as file:
         return file.read()
-
 # 파일에서 프롬프트 텍스트 읽기
 prompt_text = load_prompt_from_file(prompt_file_path)
-
 # PromptTemplate 설정
 prompt = PromptTemplate(
     input_variables=["question", "context"],  # 필요한 입력 변수 설정
     template=prompt_text  # 텍스트 파일에서 읽어온 프롬프트 텍스트
 )
-
 # LLM 모델 설정
 llm = ChatOpenAI(model_name="gpt-4o", temperature=0.5)
-
 # RAG 체인 설정
 rag_chain = (
     {"context": retriever, "question": RunnablePassthrough()}  # 질의 및 컨텍스트 설정
@@ -106,7 +99,6 @@ def display_history(container):
     with container:
         if st.session_state.chat_history:
             st.subheader("히스토리:")
-
             # 현재 사용자 uid에 해당하는 히스토리만 표시
             user_history = st.session_state.chat_history.get(st.session_state.uid, [])
             
@@ -133,7 +125,6 @@ if user_input:
         # 현재 질문을 히스토리에 즉시 추가 (응답은 나중에 업데이트)
         if st.session_state.uid not in st.session_state.chat_history:
             st.session_state.chat_history[st.session_state.uid] = []
-
     else:
         st.warning("현재 질문에 대한 응답이 처리 중입니다. 잠시만 기다려주세요.")
 
